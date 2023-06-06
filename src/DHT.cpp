@@ -77,7 +77,7 @@ eError DHT::readData()
     // start the transfer
 //    DHT_io.output();
     DHT_io = 0;
-    wait_us(1200);
+    wait_us(1800);
     DHT_io = 1;
     wait_us(30);
 //    DHT_io.input();

@@ -21,8 +21,8 @@ int main() {
     while (1) {
         // put your main code here, to run repeatedly:
 
-        ThisThread::sleep_for(2500);
-
+        // ================================================ Capteur de temperature ====================================//
+        
         error = sensor.readData();
         if (0 == error) {
             temp   = sensor.ReadTemperature(CELCIUS);
@@ -32,6 +32,8 @@ int main() {
         } else {
             printf("Error: %d\n", error);
         }
+
+        ThisThread::sleep_for(2000);
 
     }
 }
