@@ -8,6 +8,8 @@
 ThreadLvgl threadLvgl(30);
 
 DHT sensor(D8, DHT22);
+PwmOut moteur (D3);
+BufferedSerial pc(USBTX, USBRX, 9600);
 
 int main() {
 
@@ -18,11 +20,16 @@ int main() {
     int error=0;
     float temp = 0.0f, humi = 0.0f;
 
+    moteur.period(1.0/25000.0);
+    moteur.write(0.25);
+    
+    
+
     while (1) {
         // put your main code here, to run repeatedly:
 
         // ================================================ Capteur de temperature ====================================//
-        
+
         error = sensor.readData();
         if (0 == error) {
             temp   = sensor.ReadTemperature(CELCIUS);
@@ -33,7 +40,17 @@ int main() {
             printf("Error: %d\n", error);
         }
 
-        ThisThread::sleep_for(2000);
+        // ============================================== Moteur ======================================================//
+        char data;
+        if (pc.readable()) {
+            pc.read(&data, 1);
+            printf("Lecture : %c\n", data);
+            if ((data>='0')&&(data<='9')) {
+                moteur.write((data-'0')*0.1);
+            }
+        }
+
+        ThisThread::sleep_for(1000);
 
     }
 }
