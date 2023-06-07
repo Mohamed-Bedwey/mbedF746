@@ -9,6 +9,7 @@ ThreadLvgl threadLvgl(30);
 
 DHT sensor(D8, DHT22);
 PwmOut moteur (D3);
+PwmOut resistance (D6);
 BufferedSerial pc(USBTX, USBRX, 9600);
 
 int main() {
@@ -21,7 +22,10 @@ int main() {
     float temp = 0.0f, humi = 0.0f;
 
     moteur.period(1.0/25000.0);
-    moteur.write(0.25);
+    moteur.write(0.0);
+
+    resistance.period(1.0/25000.0);
+    resistance.write(0.0);
     
     
 
@@ -49,6 +53,12 @@ int main() {
                 moteur.write((data-'0')*0.1);
             }
         }
+
+        // ============================================== Reistance ======================================================//
+
+        resistance.write(0.0);
+
+    
 
         ThisThread::sleep_for(1000);
 
