@@ -7,24 +7,39 @@
 
 ThreadLvgl threadLvgl(30);
 
-// ======================= Capteur =================== //
-
+// Temperature
 DHT sensor(D8, DHT22);
 float temp = 0.0f, humi = 0.0f;
-// Temperature
 void indicateur_temp(void);
 void set_value_temp(lv_meter_indicator_t *indic, int32_t v);
 static lv_obj_t *meter_temp;
 lv_meter_indicator_t *indic_temp;
+
 // Humidite
 void indicateur_humi(void);
 void set_value_humi(lv_meter_indicator_t *indic, int32_t v);
 static lv_obj_t *meter_humi;
 lv_meter_indicator_t *indic_humi;
 
+//Moteur
 PwmOut moteur(D3);
+void boutton_moteur(void);
+static void event_boutton_moteur(lv_event_t * e);
+void led_moteur(void);
+lv_obj_t * led_mot;
+bool click_moteur = true;
+
+//Resistance
 PwmOut resistance(D6);
+void boutton_resistance(void);
+static void event_boutton_resistance(lv_event_t * e);
+void led_resistance(void);
+lv_obj_t * led_res;
+bool click_resistance = true;
+
+
 BufferedSerial pc(USBTX, USBRX, 9600);
+
 
 int main()
 {
@@ -39,13 +54,15 @@ int main()
     threadLvgl.lock();
     indicateur_temp();
     indicateur_humi();
+    boutton_moteur();
+    boutton_resistance();
+    led_moteur();
+    led_resistance();
     threadLvgl.unlock();
     
 
     while (1)
     {
-        // put your main code here, to run repeatedly:
-
         // =============== Lecture capteur de temperature ===========//
 
         error = sensor.readData();
@@ -73,10 +90,6 @@ int main()
             }
         }
 
-        // =================== Reistance ================//
-
-        resistance.write(0.0);
-
         // ======================Interface ==================//
         threadLvgl.lock();
         set_value_temp(indic_temp, temp);
@@ -89,7 +102,7 @@ int main()
 void indicateur_temp(void)
 {
     meter_temp = lv_meter_create(lv_scr_act());
-    lv_obj_set_pos(meter_temp,10,35);
+    lv_obj_set_pos(meter_temp,10,10);
     lv_obj_set_size(meter_temp, 160, 160);
 
     /*Add a scale first*/
@@ -126,11 +139,10 @@ void set_value_temp(lv_meter_indicator_t *indic, int32_t v)
 
 }
 
-
 void indicateur_humi(void)
 {
     meter_humi = lv_meter_create(lv_scr_act());
-    lv_obj_set_pos(meter_humi,310,35);
+    lv_obj_set_pos(meter_humi,310,10);
     lv_obj_set_size(meter_humi, 160, 160);
 
     /*Add a scale first*/
@@ -164,4 +176,96 @@ void indicateur_humi(void)
 void set_value_humi(lv_meter_indicator_t *indic, int32_t v)
 {
     lv_meter_set_indicator_value(meter_humi, indic, v);
+}
+
+void boutton_moteur(void)
+{
+    lv_obj_t * label;
+
+    lv_obj_t * btn1 = lv_btn_create(lv_scr_act());
+    lv_obj_add_event_cb(btn1, event_boutton_moteur, LV_EVENT_ALL, NULL);
+    lv_obj_set_pos(btn1,10,220);
+
+    label = lv_label_create(btn1);
+    lv_label_set_text(label, "Ventillation");
+    lv_obj_center(label);
+}
+static void event_boutton_moteur(lv_event_t * e)
+{
+    lv_event_code_t code = lv_event_get_code(e);
+
+    if(code == LV_EVENT_CLICKED) {
+
+        if(click_moteur == true)
+        {
+            moteur.write(0.9);
+            threadLvgl.lock();
+            lv_led_on(led_mot);
+            threadLvgl.unlock();
+            click_moteur = false;
+        }
+        else
+        {
+            moteur.write(0.0);
+            threadLvgl.lock();
+            lv_led_off(led_mot);
+            threadLvgl.unlock();
+            click_moteur = true;
+        }
+
+    }
+}
+void led_moteur(void)
+{
+    led_mot  = lv_led_create(lv_scr_act());
+    lv_led_set_brightness(led_mot, LV_LED_BRIGHT_MAX);
+    lv_obj_set_pos(led_mot,53,190);
+    lv_led_set_color(led_mot, lv_palette_main(LV_PALETTE_GREEN));
+    lv_led_off(led_mot);
+}
+
+void boutton_resistance(void)
+{
+    lv_obj_t * label;
+
+    lv_obj_t * btn1 = lv_btn_create(lv_scr_act());
+    lv_obj_add_event_cb(btn1, event_boutton_resistance, LV_EVENT_ALL, NULL);
+    lv_obj_set_pos(btn1,150,220);
+
+    label = lv_label_create(btn1);
+    lv_label_set_text(label, "Chauffage");
+    lv_obj_center(label);
+}
+static void event_boutton_resistance(lv_event_t * e)
+{
+    lv_event_code_t code = lv_event_get_code(e);
+
+    if(code == LV_EVENT_CLICKED) {
+
+         if(click_resistance == true)
+        {
+            resistance.write(0.9);
+            threadLvgl.lock();
+            lv_led_on(led_res);
+            threadLvgl.unlock();
+            click_resistance = false;
+        }
+        else
+        {
+            resistance.write(0.0);
+            threadLvgl.lock();
+            lv_led_off(led_res);
+            threadLvgl.unlock();
+            click_resistance = true;
+        }
+
+    }
+}
+void led_resistance(void)
+{
+    led_res  = lv_led_create(lv_scr_act());
+    lv_led_set_brightness(led_res, LV_LED_BRIGHT_MAX);
+    lv_obj_set_pos(led_res,185,190);
+    lv_led_set_color(led_res, lv_palette_main(LV_PALETTE_GREEN));
+    lv_led_off(led_res);
 }
