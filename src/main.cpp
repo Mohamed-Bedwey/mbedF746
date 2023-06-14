@@ -101,14 +101,15 @@ int main()
 
 void indicateur_temp(void)
 {
+    lv_obj_t * label;
     meter_temp = lv_meter_create(lv_scr_act());
     lv_obj_set_pos(meter_temp,10,10);
-    lv_obj_set_size(meter_temp, 160, 160);
+    lv_obj_set_size(meter_temp, 180, 180);
 
     /*Add a scale first*/
     lv_meter_scale_t *scale = lv_meter_add_scale(meter_temp);
-    lv_meter_set_scale_ticks(meter_temp, scale, 41, 2, 10, lv_palette_main(LV_PALETTE_GREY));
-    lv_meter_set_scale_major_ticks(meter_temp, scale, 8, 4, 15, lv_color_black(), 10);
+    lv_meter_set_scale_ticks(meter_temp, scale, 51, 2, 10, lv_palette_main(LV_PALETTE_GREY));
+    lv_meter_set_scale_major_ticks(meter_temp, scale, 5, 4, 15, lv_color_black(), 10);
 
     /*Add a blue arc to the start*/
     indic_temp = lv_meter_add_arc(meter_temp, scale, 3, lv_palette_main(LV_PALETTE_BLUE), 0);
@@ -132,6 +133,10 @@ void indicateur_temp(void)
 
     /*Add a needle line indicator*/
     indic_temp = lv_meter_add_needle_line(meter_temp, scale, 4, lv_palette_main(LV_PALETTE_GREY), -10);
+
+    label = lv_label_create(meter_temp);
+    lv_label_set_text(label, "Temperature");
+    lv_obj_set_pos(label,25,120);
 }
 void set_value_temp(lv_meter_indicator_t *indic, int32_t v)
 {
@@ -141,14 +146,15 @@ void set_value_temp(lv_meter_indicator_t *indic, int32_t v)
 
 void indicateur_humi(void)
 {
+    lv_obj_t * label;
     meter_humi = lv_meter_create(lv_scr_act());
-    lv_obj_set_pos(meter_humi,310,10);
-    lv_obj_set_size(meter_humi, 160, 160);
+    lv_obj_set_pos(meter_humi,290,10);
+    lv_obj_set_size(meter_humi, 180, 180);
 
     /*Add a scale first*/
     lv_meter_scale_t *scale = lv_meter_add_scale(meter_humi);
-    lv_meter_set_scale_ticks(meter_humi, scale, 41, 2, 10, lv_palette_main(LV_PALETTE_GREY));
-    lv_meter_set_scale_major_ticks(meter_humi, scale, 8, 4, 15, lv_color_black(), 10);
+    lv_meter_set_scale_ticks(meter_humi, scale, 51, 2, 10, lv_palette_main(LV_PALETTE_GREY));
+    lv_meter_set_scale_major_ticks(meter_humi, scale, 5, 4, 15, lv_color_black(), 10);
 
     /*Add a blue arc to the start*/
     indic_humi = lv_meter_add_arc(meter_humi, scale, 3, lv_palette_main(LV_PALETTE_BLUE), 0);
@@ -172,6 +178,10 @@ void indicateur_humi(void)
 
     /*Add a needle line indicator*/
     indic_humi = lv_meter_add_needle_line(meter_humi, scale, 4, lv_palette_main(LV_PALETTE_GREY), -10);
+
+    label = lv_label_create(meter_humi);
+    lv_label_set_text(label, "Humidite");
+    lv_obj_set_pos(label,40,120);
 }
 void set_value_humi(lv_meter_indicator_t *indic, int32_t v)
 {
@@ -198,7 +208,7 @@ static void event_boutton_moteur(lv_event_t * e)
 
         if(click_moteur == true)
         {
-            moteur.write(0.9);
+            moteur.write(1.0);
             threadLvgl.lock();
             lv_led_on(led_mot);
             threadLvgl.unlock();
@@ -244,7 +254,8 @@ static void event_boutton_resistance(lv_event_t * e)
 
          if(click_resistance == true)
         {
-            resistance.write(0.9);
+            resistance.write(1.0);
+            moteur.write(0.3);
             threadLvgl.lock();
             lv_led_on(led_res);
             threadLvgl.unlock();
@@ -253,6 +264,7 @@ static void event_boutton_resistance(lv_event_t * e)
         else
         {
             resistance.write(0.0);
+            moteur.write(0.0);
             threadLvgl.lock();
             lv_led_off(led_res);
             threadLvgl.unlock();
