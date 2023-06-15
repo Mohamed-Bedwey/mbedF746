@@ -6,40 +6,41 @@
 #include <cstdio>
 
 ThreadLvgl threadLvgl(30);
+static lv_style_t style_btn_on;
+static lv_style_t style_btn_off;
+BufferedSerial pc(USBTX, USBRX, 9600);
 
 // Temperature
 DHT sensor(D8, DHT22);
 float temp = 0.0f, humi = 0.0f;
-void indicateur_temp(void);
-void set_value_temp(lv_meter_indicator_t *indic, int32_t v);
 static lv_obj_t *meter_temp;
 lv_meter_indicator_t *indic_temp;
+void indicateur_temp(void);
 
 // Humidite
-void indicateur_humi(void);
-void set_value_humi(lv_meter_indicator_t *indic, int32_t v);
 static lv_obj_t *meter_humi;
 lv_meter_indicator_t *indic_humi;
+void indicateur_humi(void);
 
 //Moteur
 PwmOut moteur(D3);
-void boutton_moteur(void);
-static void event_boutton_moteur(lv_event_t * e);
-void led_moteur(void);
-lv_obj_t * led_mot;
+lv_obj_t * btn_mot;
 bool click_moteur = true;
+static lv_obj_t * slider_label_mot;
+void slider_mot(void);
+void boutton_moteur(void);
+static void slider_event_mot(lv_event_t * e);
+static void boutton_even_moteur(lv_event_t * e);
 
 //Resistance
 PwmOut resistance(D6);
-void boutton_resistance(void);
-static void event_boutton_resistance(lv_event_t * e);
-void led_resistance(void);
-lv_obj_t * led_res;
+lv_obj_t * btn_res;
 bool click_resistance = true;
-
-
-BufferedSerial pc(USBTX, USBRX, 9600);
-
+static lv_obj_t * slider_label_res;
+void slider_res(void);
+void boutton_resistance(void);
+static void slider_event_res(lv_event_t * e);
+static void boutton_even_resistance(lv_event_t * e);
 
 int main()
 {
@@ -52,12 +53,14 @@ int main()
     resistance.write(0.0);
 
     threadLvgl.lock();
+    lv_style_set_bg_color(&style_btn_off, lv_palette_main(LV_PALETTE_RED));
+    lv_style_set_bg_color(&style_btn_on, lv_palette_main(LV_PALETTE_GREEN));
     indicateur_temp();
     indicateur_humi();
     boutton_moteur();
     boutton_resistance();
-    led_moteur();
-    led_resistance();
+    slider_mot();
+    slider_res();
     threadLvgl.unlock();
     
 
@@ -78,22 +81,10 @@ int main()
             printf("Error: %d\n", error);
         }
 
-        // ====================== Moteur ==================//
-        char data;
-        if (pc.readable())
-        {
-            pc.read(&data, 1);
-            printf("Lecture : %c\n", data);
-            if ((data >= '0') && (data <= '9'))
-            {
-                moteur.write((data - '0') * 0.1);
-            }
-        }
-
         // ======================Interface ==================//
         threadLvgl.lock();
-        set_value_temp(indic_temp, temp);
-        set_value_humi(indic_humi, humi);
+        lv_meter_set_indicator_value(meter_temp, indic_temp, temp);
+        lv_meter_set_indicator_value(meter_humi, indic_humi, humi);
         threadLvgl.unlock();
         ThisThread::sleep_for(500);
     }
@@ -103,7 +94,7 @@ void indicateur_temp(void)
 {
     lv_obj_t * label;
     meter_temp = lv_meter_create(lv_scr_act());
-    lv_obj_set_pos(meter_temp,10,10);
+    lv_obj_set_pos(meter_temp,5,10);
     lv_obj_set_size(meter_temp, 180, 180);
 
     /*Add a scale first*/
@@ -138,17 +129,12 @@ void indicateur_temp(void)
     lv_label_set_text(label, "Temperature");
     lv_obj_set_pos(label,25,120);
 }
-void set_value_temp(lv_meter_indicator_t *indic, int32_t v)
-{
-    lv_meter_set_indicator_value(meter_temp, indic, v);
-
-}
 
 void indicateur_humi(void)
 {
     lv_obj_t * label;
     meter_humi = lv_meter_create(lv_scr_act());
-    lv_obj_set_pos(meter_humi,290,10);
+    lv_obj_set_pos(meter_humi,295,10);
     lv_obj_set_size(meter_humi, 180, 180);
 
     /*Add a scale first*/
@@ -183,24 +169,22 @@ void indicateur_humi(void)
     lv_label_set_text(label, "Humidite");
     lv_obj_set_pos(label,40,120);
 }
-void set_value_humi(lv_meter_indicator_t *indic, int32_t v)
-{
-    lv_meter_set_indicator_value(meter_humi, indic, v);
-}
 
 void boutton_moteur(void)
 {
     lv_obj_t * label;
 
-    lv_obj_t * btn1 = lv_btn_create(lv_scr_act());
-    lv_obj_add_event_cb(btn1, event_boutton_moteur, LV_EVENT_ALL, NULL);
-    lv_obj_set_pos(btn1,10,220);
+    btn_mot = lv_btn_create(lv_scr_act());
+    lv_obj_add_event_cb(btn_mot, boutton_even_moteur, LV_EVENT_ALL, NULL);
+    lv_obj_set_pos(btn_mot,190,80);
+    lv_obj_set_size(btn_mot,100,30);
+    lv_obj_add_style(btn_mot,&style_btn_off,0);
 
-    label = lv_label_create(btn1);
+    label = lv_label_create(btn_mot);
     lv_label_set_text(label, "Ventillation");
     lv_obj_center(label);
 }
-static void event_boutton_moteur(lv_event_t * e)
+static void boutton_even_moteur(lv_event_t * e)
 {
     lv_event_code_t code = lv_event_get_code(e);
 
@@ -208,9 +192,8 @@ static void event_boutton_moteur(lv_event_t * e)
 
         if(click_moteur == true)
         {
-            moteur.write(1.0);
             threadLvgl.lock();
-            lv_led_on(led_mot);
+            lv_obj_add_style(btn_mot,&style_btn_on,0);
             threadLvgl.unlock();
             click_moteur = false;
         }
@@ -218,35 +201,54 @@ static void event_boutton_moteur(lv_event_t * e)
         {
             moteur.write(0.0);
             threadLvgl.lock();
-            lv_led_off(led_mot);
+            lv_obj_add_style(btn_mot,&style_btn_off,0);
             threadLvgl.unlock();
             click_moteur = true;
         }
 
     }
 }
-void led_moteur(void)
+void slider_mot(void)
 {
-    led_mot  = lv_led_create(lv_scr_act());
-    lv_led_set_brightness(led_mot, LV_LED_BRIGHT_MAX);
-    lv_obj_set_pos(led_mot,53,190);
-    lv_led_set_color(led_mot, lv_palette_main(LV_PALETTE_GREEN));
-    lv_led_off(led_mot);
+    /*Create a slider in the center of the display*/
+    lv_obj_t * slider = lv_slider_create(lv_scr_act());
+    lv_obj_set_pos(slider,20,200);
+    lv_obj_add_event_cb(slider, slider_event_mot, LV_EVENT_VALUE_CHANGED, NULL);
+
+    /*Create a label below the slider*/
+    slider_label_mot = lv_label_create(lv_scr_act());
+    lv_label_set_text(slider_label_mot, "0%");
+
+    lv_obj_align_to(slider_label_mot, slider, LV_ALIGN_OUT_RIGHT_BOTTOM, 5, 0);
+}
+static void slider_event_mot(lv_event_t * e)
+{
+    lv_obj_t * slider = lv_event_get_target(e);
+    char buf[8];
+    lv_snprintf(buf, sizeof(buf), "%d%%", (int)lv_slider_get_value(slider));
+    lv_label_set_text(slider_label_mot, buf);
+    lv_obj_align_to(slider_label_mot, slider, LV_ALIGN_OUT_RIGHT_BOTTOM, 5, 0); 
+    if(click_moteur == false)
+    {
+        moteur.write((int)lv_slider_get_value(slider)*0.01);
+    }
 }
 
 void boutton_resistance(void)
 {
     lv_obj_t * label;
 
-    lv_obj_t * btn1 = lv_btn_create(lv_scr_act());
-    lv_obj_add_event_cb(btn1, event_boutton_resistance, LV_EVENT_ALL, NULL);
-    lv_obj_set_pos(btn1,150,220);
+    btn_res = lv_btn_create(lv_scr_act());
+    lv_obj_add_event_cb(btn_res, boutton_even_resistance, LV_EVENT_ALL, NULL);
+    lv_obj_set_pos(btn_res,190,120);
+    lv_obj_set_size(btn_res,100,30);
+    lv_obj_add_style(btn_res,&style_btn_off,0);
 
-    label = lv_label_create(btn1);
+    label = lv_label_create(btn_res);
     lv_label_set_text(label, "Chauffage");
     lv_obj_center(label);
 }
-static void event_boutton_resistance(lv_event_t * e)
+static void boutton_even_resistance(lv_event_t * e)
 {
     lv_event_code_t code = lv_event_get_code(e);
 
@@ -254,30 +256,44 @@ static void event_boutton_resistance(lv_event_t * e)
 
          if(click_resistance == true)
         {
-            resistance.write(1.0);
-            moteur.write(0.3);
             threadLvgl.lock();
-            lv_led_on(led_res);
+            lv_obj_add_style(btn_res,&style_btn_on,0);
             threadLvgl.unlock();
             click_resistance = false;
         }
         else
         {
             resistance.write(0.0);
-            moteur.write(0.0);
             threadLvgl.lock();
-            lv_led_off(led_res);
+            lv_obj_add_style(btn_res,&style_btn_off,0);
             threadLvgl.unlock();
             click_resistance = true;
         }
 
     }
 }
-void led_resistance(void)
+void slider_res(void)
 {
-    led_res  = lv_led_create(lv_scr_act());
-    lv_led_set_brightness(led_res, LV_LED_BRIGHT_MAX);
-    lv_obj_set_pos(led_res,185,190);
-    lv_led_set_color(led_res, lv_palette_main(LV_PALETTE_GREEN));
-    lv_led_off(led_res);
+    /*Create a slider in the center of the display*/
+    lv_obj_t * slider = lv_slider_create(lv_scr_act());
+    lv_obj_set_pos(slider,20,240);
+    lv_obj_add_event_cb(slider, slider_event_res, LV_EVENT_VALUE_CHANGED, NULL);
+
+    /*Create a label below the slider*/
+    slider_label_res = lv_label_create(lv_scr_act());
+    lv_label_set_text(slider_label_res, "0%");
+
+    lv_obj_align_to(slider_label_res, slider, LV_ALIGN_OUT_RIGHT_BOTTOM, 5, 0);
+}
+static void slider_event_res(lv_event_t * e)
+{
+    lv_obj_t * slider = lv_event_get_target(e);
+    char buf[8];
+    lv_snprintf(buf, sizeof(buf), "%d%%", (int)lv_slider_get_value(slider));
+    lv_label_set_text(slider_label_res, buf);
+    lv_obj_align_to(slider_label_res, slider, LV_ALIGN_OUT_RIGHT_BOTTOM, 5, 0); 
+    if(click_resistance == false)
+    {
+        resistance.write((int)lv_slider_get_value(slider)*0.01);
+    }
 }
