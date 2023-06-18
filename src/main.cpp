@@ -8,6 +8,7 @@
 ThreadLvgl threadLvgl(30);
 static lv_style_t style_btn_on;
 static lv_style_t style_btn_off;
+static lv_style_t style_btn_auto;
 BufferedSerial pc(USBTX, USBRX, 9600);
 
 // Temperature
@@ -27,20 +28,33 @@ PwmOut moteur(D3);
 lv_obj_t * btn_mot;
 bool click_moteur = true;
 static lv_obj_t * slider_label_mot;
+lv_obj_t * slider_mot_obj;
 void slider_mot(void);
 void boutton_moteur(void);
 static void slider_event_mot(lv_event_t * e);
-static void boutton_even_moteur(lv_event_t * e);
+static void boutton_event_moteur(lv_event_t * e);
 
 //Resistance
 PwmOut resistance(D6);
 lv_obj_t * btn_res;
 bool click_resistance = true;
 static lv_obj_t * slider_label_res;
+lv_obj_t * slider_res_obj;
 void slider_res(void);
 void boutton_resistance(void);
 static void slider_event_res(lv_event_t * e);
-static void boutton_even_resistance(lv_event_t * e);
+static void boutton_event_resistance(lv_event_t * e);
+
+//Mode auto
+lv_obj_t * btn_auto;
+bool click_auto = true;
+static lv_obj_t * saisie_temp;
+int val_user;
+void boutton_auto(void);
+static void boutton_event_auto(lv_event_t * e);
+void zone_saisie_temp(void);
+static void decrement_event(lv_event_t * e);
+static void increment_event(lv_event_t * e);
 
 int main()
 {
@@ -55,18 +69,20 @@ int main()
     threadLvgl.lock();
     lv_style_set_bg_color(&style_btn_off, lv_palette_main(LV_PALETTE_RED));
     lv_style_set_bg_color(&style_btn_on, lv_palette_main(LV_PALETTE_GREEN));
+    lv_style_set_bg_color(&style_btn_auto, lv_palette_main(LV_PALETTE_ORANGE));
     indicateur_temp();
     indicateur_humi();
     boutton_moteur();
     boutton_resistance();
     slider_mot();
     slider_res();
+    boutton_auto();
+    zone_saisie_temp();
     threadLvgl.unlock();
     
-
     while (1)
     {
-        // =============== Lecture capteur de temperature ===========//
+        // =============== Lecture du capteur ===========//
 
         error = sensor.readData();
         if (0 == error)
@@ -81,11 +97,49 @@ int main()
             printf("Error: %d\n", error);
         }
 
-        // ======================Interface ==================//
+        // ====================== Affichage et recuperation des valeurs sur l'interface ==================//
         threadLvgl.lock();
+        if(click_moteur == false)
+        {
+            moteur.write((int)lv_slider_get_value(slider_mot_obj)*0.01);
+        }
+        if(click_resistance == false)
+        {
+            resistance.write((int)lv_slider_get_value(slider_res_obj)*0.01);
+        }
         lv_meter_set_indicator_value(meter_temp, indic_temp, temp);
         lv_meter_set_indicator_value(meter_humi, indic_humi, humi);
         threadLvgl.unlock();
+
+        // =============================== mode auto ===========================//
+
+        if (click_auto == false)
+        {
+            threadLvgl.lock();
+            val_user = (int)lv_spinbox_get_value(saisie_temp);
+            threadLvgl.unlock();
+            printf("Val user: %.2d\n", val_user);
+
+            if (temp > val_user)
+            {
+                moteur.write(1.0);
+                resistance.write(0.0);
+               /* threadLvgl.lock();
+                lv_obj_add_style(btn_mot,&style_btn_on,0);
+                lv_obj_add_style(btn_res,&style_btn_off,0);
+                threadLvgl.unlock();*/
+            }
+            else
+            {
+                moteur.write(0.3);
+                resistance.write(1.0);
+                /*threadLvgl.lock();
+                lv_obj_add_style(btn_mot,&style_btn_off,0);
+                lv_obj_add_style(btn_res,&style_btn_on,0);
+                threadLvgl.unlock();*/
+            }
+        }
+
         ThisThread::sleep_for(500);
     }
 }
@@ -175,7 +229,7 @@ void boutton_moteur(void)
     lv_obj_t * label;
 
     btn_mot = lv_btn_create(lv_scr_act());
-    lv_obj_add_event_cb(btn_mot, boutton_even_moteur, LV_EVENT_ALL, NULL);
+    lv_obj_add_event_cb(btn_mot, boutton_event_moteur, LV_EVENT_ALL, NULL);
     lv_obj_set_pos(btn_mot,190,80);
     lv_obj_set_size(btn_mot,100,30);
     lv_obj_add_style(btn_mot,&style_btn_off,0);
@@ -184,11 +238,13 @@ void boutton_moteur(void)
     lv_label_set_text(label, "Ventillation");
     lv_obj_center(label);
 }
-static void boutton_even_moteur(lv_event_t * e)
+static void boutton_event_moteur(lv_event_t * e)
 {
     lv_event_code_t code = lv_event_get_code(e);
 
-    if(code == LV_EVENT_CLICKED) {
+    if (click_auto == true)
+    {
+        if(code == LV_EVENT_CLICKED) {
 
         if(click_moteur == true)
         {
@@ -206,7 +262,10 @@ static void boutton_even_moteur(lv_event_t * e)
             click_moteur = true;
         }
 
+     }
     }
+
+    
 }
 void slider_mot(void)
 {
@@ -223,15 +282,12 @@ void slider_mot(void)
 }
 static void slider_event_mot(lv_event_t * e)
 {
-    lv_obj_t * slider = lv_event_get_target(e);
+    slider_mot_obj = lv_event_get_target(e);
     char buf[8];
-    lv_snprintf(buf, sizeof(buf), "%d%%", (int)lv_slider_get_value(slider));
+    lv_snprintf(buf, sizeof(buf), "%d%%", (int)lv_slider_get_value(slider_mot_obj));
     lv_label_set_text(slider_label_mot, buf);
-    lv_obj_align_to(slider_label_mot, slider, LV_ALIGN_OUT_RIGHT_BOTTOM, 5, 0); 
-    if(click_moteur == false)
-    {
-        moteur.write((int)lv_slider_get_value(slider)*0.01);
-    }
+    lv_obj_align_to(slider_label_mot, slider_mot_obj, LV_ALIGN_OUT_RIGHT_BOTTOM, 5, 0); 
+
 }
 
 void boutton_resistance(void)
@@ -239,7 +295,7 @@ void boutton_resistance(void)
     lv_obj_t * label;
 
     btn_res = lv_btn_create(lv_scr_act());
-    lv_obj_add_event_cb(btn_res, boutton_even_resistance, LV_EVENT_ALL, NULL);
+    lv_obj_add_event_cb(btn_res, boutton_event_resistance, LV_EVENT_ALL, NULL);
     lv_obj_set_pos(btn_res,190,120);
     lv_obj_set_size(btn_res,100,30);
     lv_obj_add_style(btn_res,&style_btn_off,0);
@@ -248,13 +304,15 @@ void boutton_resistance(void)
     lv_label_set_text(label, "Chauffage");
     lv_obj_center(label);
 }
-static void boutton_even_resistance(lv_event_t * e)
+static void boutton_event_resistance(lv_event_t * e)
 {
     lv_event_code_t code = lv_event_get_code(e);
 
-    if(code == LV_EVENT_CLICKED) {
+    if (click_auto == true)
+    {
+        if(code == LV_EVENT_CLICKED) {
 
-         if(click_resistance == true)
+        if(click_resistance == true)
         {
             threadLvgl.lock();
             lv_obj_add_style(btn_res,&style_btn_on,0);
@@ -270,7 +328,10 @@ static void boutton_even_resistance(lv_event_t * e)
             click_resistance = true;
         }
 
+        }
     }
+
+    
 }
 void slider_res(void)
 {
@@ -287,13 +348,94 @@ void slider_res(void)
 }
 static void slider_event_res(lv_event_t * e)
 {
-    lv_obj_t * slider = lv_event_get_target(e);
+    slider_res_obj = lv_event_get_target(e);
     char buf[8];
-    lv_snprintf(buf, sizeof(buf), "%d%%", (int)lv_slider_get_value(slider));
+    lv_snprintf(buf, sizeof(buf), "%d%%", (int)lv_slider_get_value(slider_res_obj));
     lv_label_set_text(slider_label_res, buf);
-    lv_obj_align_to(slider_label_res, slider, LV_ALIGN_OUT_RIGHT_BOTTOM, 5, 0); 
-    if(click_resistance == false)
-    {
-        resistance.write((int)lv_slider_get_value(slider)*0.01);
+    lv_obj_align_to(slider_label_res, slider_res_obj, LV_ALIGN_OUT_RIGHT_BOTTOM, 5, 0); 
+}
+
+void boutton_auto(void)
+{
+    lv_obj_t * label;
+
+    btn_auto = lv_btn_create(lv_scr_act());
+    lv_obj_add_event_cb(btn_auto, boutton_event_auto, LV_EVENT_ALL, NULL);
+    lv_obj_set_pos(btn_auto,190,40);
+    lv_obj_set_size(btn_auto,100,30);
+    lv_obj_add_style(btn_auto,&style_btn_off,0);
+
+    label = lv_label_create(btn_auto);
+    lv_label_set_text(label, "Auto");
+    lv_obj_center(label);
+}
+static void boutton_event_auto(lv_event_t * e)
+{
+    lv_event_code_t code = lv_event_get_code(e);
+
+    if(code == LV_EVENT_CLICKED) {
+
+        if(click_auto == true)
+        {
+            moteur.write(0.0);
+            resistance.write(0.0);
+            threadLvgl.lock();
+            lv_obj_add_style(btn_auto,&style_btn_auto,0);
+            lv_obj_add_style(btn_mot,&style_btn_off,0);
+            lv_obj_add_style(btn_res,&style_btn_off,0);
+            threadLvgl.unlock();
+            click_auto = false;
+            click_moteur = true;
+            click_resistance = true;
+        }
+        else
+        {
+            moteur.write(0.0);
+            resistance.write(0.0);
+            threadLvgl.lock();
+            lv_obj_add_style(btn_auto,&style_btn_off,0);
+            lv_obj_add_style(btn_mot,&style_btn_off,0);
+            lv_obj_add_style(btn_res,&style_btn_off,0);
+            threadLvgl.unlock();
+            click_auto = true;
+        }
+
     }
+
+}
+static void increment_event(lv_event_t * e)
+{
+    lv_event_code_t code = lv_event_get_code(e);
+    if(code == LV_EVENT_SHORT_CLICKED || code  == LV_EVENT_LONG_PRESSED_REPEAT) {
+        lv_spinbox_increment(saisie_temp);
+    }
+}
+static void decrement_event(lv_event_t * e)
+{
+    lv_event_code_t code = lv_event_get_code(e);
+    if(code == LV_EVENT_SHORT_CLICKED || code == LV_EVENT_LONG_PRESSED_REPEAT) {
+        lv_spinbox_decrement(saisie_temp);
+    }
+}
+void zone_saisie_temp(void)
+{
+    saisie_temp = lv_spinbox_create(lv_scr_act());
+    lv_spinbox_set_range(saisie_temp, 0, 80);
+    lv_spinbox_set_digit_format(saisie_temp, 2, 0);
+    lv_obj_set_width(saisie_temp, 40);
+    lv_obj_set_pos(saisie_temp,380,205);
+
+    lv_coord_t h = lv_obj_get_height(saisie_temp);
+
+    lv_obj_t * btn = lv_btn_create(lv_scr_act());
+    lv_obj_set_size(btn, h, h);
+    lv_obj_align_to(btn, saisie_temp, LV_ALIGN_OUT_RIGHT_MID, 5, 0);
+    lv_obj_set_style_bg_img_src(btn, LV_SYMBOL_PLUS, 0);
+    lv_obj_add_event_cb(btn, increment_event, LV_EVENT_ALL,  NULL);
+
+    btn = lv_btn_create(lv_scr_act());
+    lv_obj_set_size(btn, h, h);
+    lv_obj_align_to(btn, saisie_temp, LV_ALIGN_OUT_LEFT_MID, -5, 0);
+    lv_obj_set_style_bg_img_src(btn, LV_SYMBOL_MINUS, 0);
+    lv_obj_add_event_cb(btn, decrement_event, LV_EVENT_ALL, NULL);
 }
